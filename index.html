@@ -1,0 +1,64 @@
+<!--
+Sources:
+    https://stackoverflow.com/questions/21478738/how-can-we-do-pdf-merging-using-javascript
+    https://pdf-lib.js.org/
+-->
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <script src="https://unpkg.com/pdf-lib"></script>
+    </head>
+
+    <body>
+        <!--
+            TODO: Put interface here
+        -->
+        <iframe id="pdf" style="width: 100%; height: 100%;"></iframe>
+        <script>
+            createPdf();
+
+            async function createPdf() {
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const page = pdfDoc.addPage([350, 400]);
+                page.moveTo(110, 200);
+                page.drawText('Hello World!');
+                const pdfDataUri = await pdfDoc.saveAsBase64({ dataUri: true });
+                document.getElementById('pdf').src = pdfDataUri;
+            }
+
+            async function mergeAllPDFs(urls) {
+
+                // create an empty PDFLib object of PDFDocument to do the merging into
+                const pdfDoc = await PDFLib.PDFDocument.create();
+
+                // iterate over all documents to merge
+                const numDocs = urls.length;    
+                for(var i = 0; i < numDocs; i++) {
+
+                    // download the document
+                    const donorPdfBytes = await fetch(urls[i]).then(res => res.arrayBuffer());
+
+                    // load/convert the document into a PDFDocument object
+                    const donorPdfDoc = await PDFLib.PDFDocument.load(donorPdfBytes);
+
+                    // iterate over the document's pages
+                    const docLength = donorPdfDoc.getPageCount();
+                    for(var k = 0; k < docLength; k++) {
+                        // extract the page to copy
+                        const [donorPage] = await pdfDoc.copyPages(donorPdfDoc, [k]);
+
+                        // add the page to the overall merged document
+                        pdfDoc.addPage(donorPage);
+                    }
+                }
+
+                // save as a Base64 URI
+                const pdfDataUri = await pdfDoc.saveAsBase64({ dataUri: true });
+
+                // strip off the first part to the first comma "data:image/png;base64,iVBORw0K..."
+                const data_pdf = pdfDataUri.substring(pdfDataUri.indexOf(',') + 1);
+            }
+
+        </script>
+    </body>
+</html>
