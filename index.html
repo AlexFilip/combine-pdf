@@ -10,53 +10,80 @@ Sources:
     </head>
 
     <body>
+        <div class="form-example">
+            Upload PDF files: <input type="file" accept=".pdf" id="fileUpload" multiple />
+        </div>
+
         <!--
-            TODO: Put interface here
+            <div class="form-example">
+                <input type="button" value="Combine PDFs" onclick="makePDF()" />
+            </div>
         -->
-        <iframe id="pdf" style="width: 100%; height: 100%;"></iframe>
+
+        <div style="text-align: center">
+            <iframe id="pdf" style="width: 90%; height: 80%;"></iframe>
+        </div>
+
         <script>
-            createPdf();
+            let arrayBuffers = []
+            fileUpload.addEventListener("change", (event) => {
+                console.log("Files selected: ", fileUpload.files)
 
-            async function createPdf() {
-                const pdfDoc = await PDFLib.PDFDocument.create();
-                const page = pdfDoc.addPage([350, 400]);
-                page.moveTo(110, 200);
-                page.drawText('Hello World!');
-                const pdfDataUri = await pdfDoc.saveAsBase64({ dataUri: true });
-                document.getElementById('pdf').src = pdfDataUri;
-            }
+                arrayBuffers = Array(fileUpload.files.length)
 
-            async function mergeAllPDFs(urls) {
+                if(fileUpload.files.length > 0) {
+                    let numFilesUploaded = 0
 
-                // create an empty PDFLib object of PDFDocument to do the merging into
-                const pdfDoc = await PDFLib.PDFDocument.create();
 
-                // iterate over all documents to merge
-                const numDocs = urls.length;    
-                for(var i = 0; i < numDocs; i++) {
+                    for(let fileIndex = 0; fileIndex < fileUpload.files.length; ++fileIndex) {
+                        const file = fileUpload.files[fileIndex]
 
-                    // download the document
-                    const donorPdfBytes = await fetch(urls[i]).then(res => res.arrayBuffer());
+                        const reader = new FileReader()
 
-                    // load/convert the document into a PDFDocument object
-                    const donorPdfDoc = await PDFLib.PDFDocument.load(donorPdfBytes);
+                        reader.onload = (e) => {
+                            const fileContent = e.target.result
+                            console.log(file.name, "File content:", e.target, fileContent)
+                            arrayBuffers[fileIndex] = fileContent
 
-                    // iterate over the document's pages
-                    const docLength = donorPdfDoc.getPageCount();
-                    for(var k = 0; k < docLength; k++) {
-                        // extract the page to copy
-                        const [donorPage] = await pdfDoc.copyPages(donorPdfDoc, [k]);
+                            numFilesUploaded += 1
+                            if(numFilesUploaded == fileUpload.files.length) {
+                                mergeAllPDFs(arrayBuffers)
+                            }
+                        }
 
-                        // add the page to the overall merged document
-                        pdfDoc.addPage(donorPage);
+                        reader.onerror = (e) => {
+                            console.error("Error reading file:", e.target.error)
+                        }
+
+                        console.log("file = ", file, typeof file)
+                        reader.readAsArrayBuffer(file)
+                    }
+                }
+            })
+
+            async function mergeAllPDFs(arrayBuffers) {
+                const pdfDoc = await PDFLib.PDFDocument.create()
+
+                for(const buf of arrayBuffers) {
+                    const donorPdfDoc = await PDFLib.PDFDocument.load(buf)
+                    console.log("Donor pdf doc", donorPdfDoc)
+
+                    const docLength = donorPdfDoc.getPageCount()
+                    const indexArray = Array.from({length: docLength}).map((_, i) => i)
+                    const pages = await pdfDoc.copyPages(donorPdfDoc, indexArray)
+
+                    for(const page of pages) {
+                        pdfDoc.addPage(page)
                     }
                 }
 
-                // save as a Base64 URI
-                const pdfDataUri = await pdfDoc.saveAsBase64({ dataUri: true });
+                const pdfDataUri = await pdfDoc.saveAsBase64({ dataUri: true })
+                document.getElementById('pdf').src = pdfDataUri
+            }
 
-                // strip off the first part to the first comma "data:image/png;base64,iVBORw0K..."
-                const data_pdf = pdfDataUri.substring(pdfDataUri.indexOf(',') + 1);
+            function makePDF() {
+                alert("Name = " + document.getElementById('name').value + " | Email = " + document.getElementById('email').value)
+                return false
             }
 
         </script>
